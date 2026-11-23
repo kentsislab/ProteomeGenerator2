@@ -98,32 +98,39 @@ main: {
 
     my %blast_hits;
     if ($blast_hits_file) {
+        print STDERR "Loading blast hits\n";
         %blast_hits = &parse_blastp_hits_file($blast_hits_file);
+        print STDERR "Done\n";
     }
 
     my %pfam_hits;
     if ($pfam_hits_file) {
+        print STDERR "loading pfam hits\n";
         %pfam_hits = &parse_pfam_hits_file($pfam_hits_file);
+        print STDERR "Done\n";
     }
 
     my %cds_scores;
     if ($cds_scores_file) {
+        print STDERR "loading cds scores\n";
       %cds_scores = &parse_CDS_scores_file ($cds_scores_file);
+        print STDERR "Done\n";
     }
         
     my $gene_obj_indexer_href = {};
     
+    print STDERR "index gff3\n";
     my $asmbl_id_to_gene_list_href = &GFF3_utils2::index_GFF3_gene_objs($gff3_file, $gene_obj_indexer_href);
     
     foreach my $asmbl_id (sort keys %$asmbl_id_to_gene_list_href) {
-        
+        print STDERR "on asmbl id: $asmbl_id\n";
         my @gene_ids = @{$asmbl_id_to_gene_list_href->{$asmbl_id}};
         
         #print "ASMBL: $asmbl_id, gene_ids: @gene_ids\n";
         my @gene_entries;
         
         foreach my $gene_id (@gene_ids) {
-            
+            print(". . . $gene_id");
             my $gene_obj_ref = $gene_obj_indexer_href->{$gene_id};
 
             my $model_id = $gene_obj_ref->{Model_feat_name};
@@ -136,10 +143,11 @@ main: {
                 $homology_count++;
             }
 
+            print(". . . . . . getcdslength");
             my $orf_length = $gene_obj_ref->get_CDS_length();
             my $cds_scores_aref = $cds_scores{$model_id};
 
-
+            print(". . . . . . selection criteria");
             ## apply selection criteria
             unless ($homology_count 
                     ||
@@ -158,7 +166,7 @@ main: {
                            homology_count => $homology_count,
                            cds_scores => $cds_scores_aref,
             };
-            
+            print(". . . . . . PUSH");
             push (@gene_entries, $struct);
             
             
@@ -170,7 +178,7 @@ main: {
         }
         
         ## prioritize orfs for further screening.
-        
+        print STDERR "sorting";
         @gene_entries = sort {
             $b->{homology_count} <=> $a->{homology_count}
             ||
@@ -192,11 +200,12 @@ main: {
         }
         
 
-
+        print STDERR "Remove overlapping orfs from gene entries";
         @gene_entries = &remove_overlapping_orfs(@gene_entries);
         
         
         if ($SINGLE_BEST_ORF_FLAG) {
+            print STDERR "getting single best ORF";
             ## re-sort and take the longest one w/ homology info:
             @gene_entries = sort {
                 $b->{homology_count} <=> $a->{homology_count}
@@ -207,8 +216,9 @@ main: {
             @gene_entries = ($gene_entries[0]);
         }
                 
+        print STDERR "going through gene entries again";
         foreach my $gene_entry (@gene_entries) {
-            
+            print STDERR ". $gene_entry";
             my $gene_obj = $gene_entry->{gene_obj};
 
             my $model_id = $gene_obj->{Model_feat_name};
@@ -226,7 +236,7 @@ main: {
 
 
             $gene_obj->{com_name} =  $adj_comname;            
-            
+            print STDERR "Printing to output";
             print $gene_obj->to_GFF3_format(source => "transdecoder") . "\n";
         }
         

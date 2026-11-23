@@ -1,0 +1,171 @@
+directories:
+  PG2_installation_dir: /lila/data/bicgrp/kristakaz/git/ProteomeGenerator2
+  optional:
+    temp_dir: /scratch/kristakaz
+  working_and_output_dir: /lila/data/bicgrp/kristakaz/pg2/Proj_B-101-986/rundir/F101
+input_files:
+  RNA-seq_module:
+    fastq_inputs:
+      F101:
+        data_is_stranded: false
+        experiment_vs_control: experiment
+        read_groups:
+          RG1:
+            R1_fq.gz: /lila/data/bicgrp/CACHE/PG2/BICDownloads/AML_Proteogenomic_Oellerich_PMID35245447/KentsisEGA/fastq_EGAD/EGAD00001008484/PART_2/prod_ega-box-1771_EGAR00003068215_MLL_159667_M056_R1.fastq.gz
+            R2_fq.gz: /lila/data/bicgrp/CACHE/PG2/BICDownloads/AML_Proteogenomic_Oellerich_PMID35245447/KentsisEGA/fastq_EGAD/EGAD00001008484/PART_2/prod_ega-box-1771_EGAR00003068215_MLL_159667_M056_R2.fastq.gz
+            optional:
+              3prime_adapter_sequence: null
+    input_file_format: fastq
+    read_length: 200
+    reads_are_paired_end: true
+  genome_personalization_module:
+    cohort_or_organism_name: AML
+    fastq_inputs:
+      F101:
+        matched_sample_params:
+          is_matched_sample: false
+        read_groups:
+          DNA1:
+            R1_fq.gz: /lila/data/bicgrp/CACHE/PG2/BICDownloads/AML_Proteogenomic_Oellerich_PMID35245447/KentsisEGA/fastq_EGAD/EGAD00001008501/PART_2/prod_ega-box-1771_EGAR00003071710_F101_R1.fastq.gz
+            R2_fq.gz: /lila/data/bicgrp/CACHE/PG2/BICDownloads/AML_Proteogenomic_Oellerich_PMID35245447/KentsisEGA/fastq_EGAD/EGAD00001008501/PART_2/prod_ega-box-1771_EGAR00003071710_F101_R2.fastq.gz
+            optional:
+              3prime_adapter_sequence: null
+              library_id: F101_DNA1
+              sequencing_platform: ILLUMINA
+    input_file_format:
+    - fastq
+    whole_genome_or_exome: true
+  proteomics_module:
+    custom_params_xml: null
+    experiment_LCMS_file_directory: null
+    input_file_format: null
+    optional_control_LCMS_file_directory: null
+    paramGroups:
+      0:
+        fixedMods:
+        - Carbamidomethyl (C)
+        lcms_runtype: Standard
+        protease: Trypsin/P
+        uniquely_identifying_file_substring: T0
+        variableMods:
+        - Oxidation (M)
+        - Acetyl (Protein N-term)
+        - Deamidation (NQ)
+      1:
+        fixedMods:
+        - Carbamidomethyl (C)
+        lcms_runtype: Standard
+        protease: GluC
+        uniquely_identifying_file_substring: G0
+        variableMods:
+        - Oxidation (M)
+        - Acetyl (Protein N-term)
+        - Deamidation (NQ)
+non-conda_packages:
+  bcftools-dev: utils/bcftools_dev/bcftools
+  chainSwap: utils/chainSwap
+parameters:
+  RNA-seq_module:
+    STAR_alignment:
+      advanced:
+        max_intron_length: 100000
+        max_mates_gap: 100000
+        max_seeds_per_window: 50
+    StringTie_transcriptome_assembly:
+      advanced:
+        keep_retained_introns: true
+        min_coverage: 2.5
+        min_fpkm_merge: 0
+        min_isoform_frac: 0.01
+        min_tpm_merge: 0
+        min_transcript_bp_gap: 50
+      append_genome_annotation: false
+      min_transcript_length: 90
+    read_filtering:
+      advanced:
+        filter_out_bamFlags:
+        - 4
+        - 256
+        - 512
+      maximum_allowed_multimaps: 2
+  genome_personalization_module:
+    pre-processing:
+      advanced:
+        BQSR_intervals_scatter: 20
+        clip_overlapping_reads: true
+      clip_adapters: false
+      keep_secondary_alignments: true
+      max_insertions_or_deletions: -1
+    variant_calling:
+      advanced:
+        indel_tranche: 96.0
+        snp_tranche: 99.9
+        variant_intervals_scatter: 5
+      make_customRef_diploid: true
+      resources:
+        germline:
+          indels_db: /lila/data/bicgrp/pipelines/pg2/resources/GRCh38/GATK_resource_bundle/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz
+          snps_db: /lila/data/bicgrp/pipelines/pg2/resources/GRCh38/GATK_resource_bundle/hapmap_3.3.hg38.vcf.gz
+        somatic:
+          germline_population_db: /lila/data/bicgrp/pipelines/pg2/resources/GRCh38/af-only-gnomad.hg38.vcf.gz
+        wgs_calling_regions: /lila/data/bicgrp/pipelines/pg2/resources/GRCh38/wgs_calling_regions.hg38.interval_list
+  protein_prediction_main:
+    advanced:
+      ignore_overlap_for_antisense_ORF: true
+      max_overlap_pct: 20
+      single_best_ORF_only: false
+    min_peptide_ORF_length: 100
+  proteomics_module:
+    FTMS_mass_tolerance: 20
+    FTMS_units: ppm
+    ITMS_mass_tolerance: 0.5
+    ITMS_units: Da
+    first_search_pep_tolerance: 20
+    main_search_pep_tolerance: 4.5
+    max_missed_cleavages: 2
+    min_pep_len: 7
+    nonspecific_max_pep_len: 25
+    nonspecific_min_pep_len: 8
+    pep_tolerance_units: ppm
+    peptide_FDR: 0.01
+    protein_FDR: 0.01
+stock_references:
+  genome:
+    fasta: /lila/data/bicgrp/pipelines/pg2/resources/GRCh38/GRCh38.genome.fa
+    gtf: /lila/data/bicgrp/pipelines/pg2/resources/GRCh38/gencode.v31.annotation.gtf
+    optional_aligner_indices:
+      BWA:
+        BWA_index_dir: null
+        BWA_prefix: null
+      STAR_index_dir: null
+  proteome:
+    fasta: /lila/data/bicgrp/pipelines/pg2/resources/UniProt/UP_sprot_human_canonical+isoforms+cRAP.fasta
+    second_fasta: /lila/data/bicgrp/pipelines/pg2/resources/GRCh38/gencode.v31.pc_translations.fa
+user_defined_workflow:
+  RNA-seq_module:
+    enable_RNA-seq_module: true
+    gene_fusion_track:
+      assemble_gene_fusions_with_Arriba: true
+    transcriptome_track:
+      GTF-guided-mapping_or_denovo-assembly: denovo
+      assemble_transcriptome_with_StringTie: true
+      retain_all_fully_covered_reference_transcripts: false
+  genome_annotation_track:
+    desired_genes:
+      all_coding_genes: false
+      all_genes: true
+      all_transcribed_genes: false
+    track_enabled: false
+  genome_personalization_module:
+    continuation:
+      just_created_custom_genome: false
+    create_separate_tumor_normal_genomes: false
+    data_is_matched_tumor_normal: false
+    enable_genome_personalization_module: true
+    variant_calling_submodule:
+      call_germline_variants_with_GATK4_HaplotypeCaller: true
+      call_somatic_variants_with_GATK4_Mutect2: true
+      continuation:
+        just_finished_variant_calling: false
+        just_ran_PG2_preprocessing: false
+      run_pre-processing_steps: true

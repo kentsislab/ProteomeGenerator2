@@ -57,7 +57,9 @@ snakemake.utils.makedirs('out/logs/variant_calling/intervals')
 snakemake.utils.makedirs('out/logs/variant_calling')
 snakemake.utils.makedirs('out/logs/variant_calling/chr-wise')
 snakemake.utils.makedirs('out/logs/variant_calling/intervals')
+snakemake.utils.makedirs('out/logs/variant_calling/assign_tranches')
 NUM_VARIANT_INTERVALS = config['parameters']['genome_personalization_module']['variant_calling']['advanced']['variant_intervals_scatter']
+
 rule var_00_ScatterVariantCallingIntervals:
     input: config['parameters']['genome_personalization_module']['variant_calling']['resources']['wgs_calling_regions']
     output: "out/{study_group}/variant_calling/intervals/{interval}-scattered.interval_list"
@@ -69,43 +71,62 @@ rule var_00_ScatterVariantCallingIntervals:
               -R {STOCK_GENOME_FASTA} -L {input} -scatter {NUM_VARIANT_INTERVALS} -O out/{wildcards.study_group}/variant_calling/intervals"
 
 if (not just_ran_WGS_preprocessing) and running_preprocessing:
-    rule var_00_TumorSymlinkToPreProcessingOutputBam:
-        input: bam=WGS_preprocessing(expand("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bam",sample=TUMOR_SAMPLES)),bai=WGS_preprocessing(expand("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bai",sample=TUMOR_SAMPLES))
-        output: bam="out/tumor/variant_calling/{sample}.analysis_ready.bam",bai="out/tumor/variant_calling/{sample}.analysis_ready.bam.bai"
-        params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
-        run: 
-            in_bam_path = os.path.abspath(str(input.bam))
-            in_bai_path = os.path.abspath(str(input.bai))
-            command = "ln -s {} {}; ln -s {} {}".format(in_bam_path, output.bam, in_bai_path, output.bai)
-            shell(command)
-    rule var_00_SymlinkToPreProcessingOutputBam:
-        input: bam=WGS_preprocessing(expand("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bam",sample=NORMAL_SAMPLES)),bai=WGS_preprocessing(expand("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bai",sample=NORMAL_SAMPLES))
-        output: bam=expand("out/{study_group}/variant_calling/{{sample}}.analysis_ready.bam",study_group=['normal'] if config['user_defined_workflow']['genome_personalization_module']['data_is_matched_tumor_normal'] else ['experiment']),bai=expand("out/{study_group}/variant_calling/{{sample}}.analysis_ready.bam.bai",study_group=['normal'] if config['user_defined_workflow']['genome_personalization_module']['data_is_matched_tumor_normal'] else ['experiment'])
-        params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
-        run: 
-            in_bam_path = os.path.abspath(str(input.bam))
-            in_bai_path = os.path.abspath(str(input.bai))
-            command = "ln -s {} {}; ln -s {} {}".format(in_bam_path, output.bam, in_bai_path, output.bai)
-            shell(command)
+    if sample in TUMOR_SAMPLES:
+        rule var_00_TumorSymlinkToPreProcessingOutputBam:
+            input: 
+                bam=WGS_preprocessing("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bam"),
+                bai=WGS_preprocessing("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bai")
+            output: 
+                bam="out/tumor/variant_calling/{sample}.analysis_ready.bam",bai="out/tumor/variant_calling/{sample}.analysis_ready.bam.bai"
+            params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
+            run: 
+                in_bam_path = os.path.abspath(str(input.bam))
+                in_bai_path = os.path.abspath(str(input.bai))
+                command = "ln -s {} {}; ln -s {} {}".format(in_bam_path, output.bam, in_bai_path, output.bai)
+                shell(command)
+    elif sample in NORMAL_SAMPLES:
+        rule var_00_SymlinkToPreProcessingOutputBam:
+            input: 
+                bam=WGS_preprocessing("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bam"),
+                bai=WGS_preprocessing("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bai")
+            output: 
+                bam=expand("out/{study_group}/variant_calling/{{sample}}.analysis_ready.bam",study_group=['normal'] if config['user_defined_workflow']['genome_personalization_module']['data_is_matched_tumor_normal'] else ['experiment']),
+                bai=expand("out/{study_group}/variant_calling/{{sample}}.analysis_ready.bam.bai",study_group=['normal'] if config['user_defined_workflow']['genome_personalization_module']['data_is_matched_tumor_normal'] else ['experiment'])
+            params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
+            run: 
+                in_bam_path = os.path.abspath(str(input.bam))
+                in_bai_path = os.path.abspath(str(input.bai))
+                command = "ln -s {} {}; ln -s {} {}".format(in_bam_path, output.bam, in_bai_path, output.bai)
+                shell(command)
 elif just_ran_WGS_preprocessing:
-    rule var_00_TumorSymlinkToPreProcessingOutputBam:
-        input: bam=expand("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bam",sample=TUMOR_SAMPLES),bai=expand("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bai",sample=TUMOR_SAMPLES)
-        output: bam="out/tumor/variant_calling/{sample}.analysis_ready.bam",bai="out/tumor/variant_calling/{sample}.analysis_ready.bam.bai"
-        params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
-        run: 
-            in_bam_path = os.path.abspath(str(input.bam))
-            in_bai_path = os.path.abspath(str(input.bai))
-            command = "ln -s {} {}; ln -s {} {}".format(in_bam_path, output.bam, in_bai_path, output.bai)
-            shell(command)
-    rule var_00_SymlinkToPreProcessingOutputBam:
-        input: bam=expand("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bam",sample=NORMAL_SAMPLES),bai=expand("out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bai",sample=NORMAL_SAMPLES)
-        output: bam=expand("out/{study_group}/variant_calling/{{sample}}.analysis_ready.bam",study_group=['normal'] if config['user_defined_workflow']['genome_personalization_module']['data_is_matched_tumor_normal'] else ['experiment']),bai=expand("out/{study_group}/variant_calling/{{sample}}.analysis_ready.bam.bai",study_group=['normal'] if config['user_defined_workflow']['genome_personalization_module']['data_is_matched_tumor_normal'] else ['experiment'])
-        params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
-        run:
-            in_bam_path = os.path.abspath(str(input.bam))
-            in_bai_path = os.path.abspath(str(input.bai))
-            command = "ln -s {} {}; ln -s {} {}".format(in_bam_path, output.bam, in_bai_path, output.bai)
-            shell(command)
+    if sample in TUMOR_SAMPLES:
+        rule var_00_TumorSymlinkToPreProcessingOutputBam:
+            input: 
+                bam="out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bam",
+                bai="out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bai"
+            output: 
+                bam="out/tumor/variant_calling/{sample}.analysis_ready.bam",
+                bai="out/tumor/variant_calling/{sample}.analysis_ready.bam.bai"
+            params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
+            run: 
+                in_bam_path = os.path.abspath(str(input.bam))
+                in_bai_path = os.path.abspath(str(input.bai))
+                command = "ln -s {} {}; ln -s {} {}".format(in_bam_path, output.bam, in_bai_path, output.bai)
+                shell(command)
+    elif sample in NORMAL_SAMPLES:
+        rule var_00_SymlinkToPreProcessingOutputBam2:
+            input: 
+                bam="out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bam",
+                bai="out/WGS/{sample}.aligned_sorted_ubam-merged_RG-merged_dedup_fixedtags_BQSR.analysis_ready.bai"
+            output: 
+                bam=expand("out/{study_group}/variant_calling/{{sample}}.analysis_ready.bam",study_group=['normal'] if config['user_defined_workflow']['genome_personalization_module']['data_is_matched_tumor_normal'] else ['experiment']),
+                bai=expand("out/{study_group}/variant_calling/{{sample}}.analysis_ready.bam.bai",study_group=['normal'] if config['user_defined_workflow']['genome_personalization_module']['data_is_matched_tumor_normal'] else ['experiment'])
+            params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
+            run:
+                in_bam_path = os.path.abspath(str(input.bam))
+                in_bai_path = os.path.abspath(str(input.bai))
+                command = "ln -s {} {}; ln -s {} {}".format(in_bam_path, output.bam, in_bai_path, output.bai)
+                shell(command)
 
 #elif 'bam' in input_file_format:
 #    print(input_file_format)
@@ -116,19 +137,29 @@ else: # input is an analysis-ready BAM
         if not PROCESSED_BAM_DICT[sample_name]['pre-processing_already_complete']: all_bams_preprocessed = False
     assert('bam' in input_file_format and all_bams_preprocessed), "ERROR: Variant calling is turned on, but WGS/WES pre-processing is turned off. Therefore all input files must be coordinate-sorted, duplicate-marked, analysis-ready BAMs. Please ensure that this is the case, and if so that the corresponding parameters are set (i.e. input_files->genome_personalization_module->input_file_format = 'bam'; input_files->genome_personalization_module->bam_inputs-><sample>->pre-processing_already_complete = true). Please also double check that pre-processing was not disabled erroneously."
     rule var_00_SymlinkToUserPreprocessedBam:
-        input: bam=lambda wildcards: os.path.abspath(config['input_files']['genome_personalization_module']['bam_inputs'][wildcards.sample]['bam_file']),bai=lambda wildcards: os.path.abspath(config['input_files']['genome_personalization_module']['bam_inputs'][wildcards.sample]['bai_file'])
-        output: bam="out/{study_group}/variant_calling/{sample}.analysis_ready.bam",bai="out/{study_group}/variant_calling/{sample}.analysis_ready.bai"
+        input: 
+            bam=lambda wildcards: os.path.abspath(config['input_files']['genome_personalization_module']['bam_inputs'][wildcards.sample]['bam_file']),
+            bai=lambda wildcards: os.path.abspath(config['input_files']['genome_personalization_module']['bam_inputs'][wildcards.sample]['bai_file'])
+        output: 
+            bam="out/{study_group}/variant_calling/{sample}.analysis_ready.bam",
+            bai="out/{study_group}/variant_calling/{sample}.analysis_ready.bai"
         params: n="1", mem_per_cpu="4", R="'span[hosts=1]'",o="out/logs/variant_calling/symlink.out",eo="out/logs/variant_calling/symlink.err",J="symlink"
-        shell: "ln -s {input.bam} {output.bam}; ln -s {input.bai} {output.bai}"
+        shell: 
+            "ln -s {input.bam} {output.bam}; ln -s {input.bai} {output.bai}"
 
 rule var_germ_01_CallGermlineVariantsPerInterval:
-    input: bam="out/{study_group}/variant_calling/{sample}.analysis_ready.bam", interval_list="out/{study_group}/variant_calling/intervals/{interval}-scattered.interval_list"
-    output: temp("out/{study_group}/variant_calling/HTC-scattered/{sample}.HTC.{interval}.g.vcf")
-    params: n="4", mem_per_cpu="3", R="'span[hosts=1] rusage[mem=3]'", \
-        o="out/logs/variant_calling/intervals/vcf_{interval}.out", eo="out/logs/variant_calling/intervals/vcf_{interval}.err", \
+    input: 
+        bam="out/{study_group}/variant_calling/{sample}.analysis_ready.bam", 
+        interval_list="out/{study_group}/variant_calling/intervals/{interval}-scattered.interval_list"
+    output: 
+        temp("out/{study_group}/variant_calling/HTC-scattered/{sample}.HTC.{interval}.g.vcf")
+    params: n="4", mem_per_cpu="3", R="'span[hosts=1] rusage[mem=3]'", 
+        o="out/logs/variant_calling/intervals/vcf_{interval}.out", eo="out/logs/variant_calling/intervals/vcf_{interval}.err", 
         J="generate_vcf_{interval}"
-    conda: "envs/gatk4.yaml"
-    shell: "gatk --java-options '-Xmx12g' HaplotypeCaller -R {STOCK_GENOME_FASTA} -I {input.bam} -O {output} -L {input.interval_list} -ERC GVCF"
+    conda: 
+        "envs/gatk4.yaml"
+    shell: 
+        "gatk --java-options '-Xmx12g' HaplotypeCaller -R {STOCK_GENOME_FASTA} -I {input.bam} -O {output} -L {input.interval_list} -ERC GVCF"
 
 rule var_germ_02_GenotypeTumorSamplePerInterval:
     input: gvcf="out/{study_group}/variant_calling/HTC-scattered/{sample}.HTC.{interval}.g.vcf", interval_list="out/{study_group}/variant_calling/intervals/{interval}-scattered.interval_list"
@@ -166,7 +197,7 @@ if is_whole_genome_or_exome:
         params: n="16", R="'span[hosts=1] rusage[mem=8]'", \
             o="out/logs/variant_calling/intervals/score_variants.out", eo="out/logs/variant_calling/intervals/score_variants.err", \
             J="score_variants"
-        singularity: "docker://broadinstitute/gatk:4.1.4.1"
+        singularity: "/lila/data/bicgrp/pipelines/pg2/sifs/gatk4.1.4.1.sif"
         shell: "gatk --java-options '-Xmx128g' CNNScoreVariants -R {STOCK_GENOME_FASTA} -V {input.vcf} -O {output}"
 
     rule var_germ_TMP_CNN2D_ScoreVariants:
@@ -175,15 +206,15 @@ if is_whole_genome_or_exome:
         params: n="16", R="'span[hosts=1] rusage[mem=8]'", \
             o="out/logs/variant_calling/intervals/score_variants.out", eo="out/logs/variant_calling/intervals/score_variants.err", \
             J="score_variants"
-        singularity: "docker://broadinstitute/gatk:4.1.4.1"
+        singularity: "/lila/data/bicgrp/pipelines/pg2/sifs/gatk4.1.4.1.sif"
         shell: "gatk --java-options '-Xmx128g' CNNScoreVariants -R {STOCK_GENOME_FASTA} -I {input.bam} -V {input.vcf} -O {output} --tensor-type read_tensor"
     rule var_germ_03_CNN2D_ScoreVariants:
         input: bam="out/{study_group}/variant_calling/{sample}.analysis_ready.bam",vcf="out/{study_group}/variant_calling/HTC-scattered/{sample}.HTC.{interval}.genotyped.vcf",interval_list="out/{study_group}/variant_calling/intervals/{interval}-scattered.interval_list"
         output: "out/{study_group}/variant_calling/HTC-scattered/{sample}.HTC.{interval}.CNN-scored.vcf.gz"
-        params: n="1", mem_per_cpu="8", R="'span[hosts=1] rusage[mem=8]'", \
+        params: n="1", mem_per_cpu="16", R="'span[hosts=1] rusage[mem=16]'", \
             o="out/logs/variant_calling/intervals/score_variants_{interval}.out", eo="out/logs/variant_calling/intervals/score_variants_{interval}.err", \
             J="score_variants_{interval}"
-        singularity: "docker://broadinstitute/gatk:4.1.4.1"
+        singularity: "/lila/data/bicgrp/pipelines/pg2/sifs/gatk4.1.4.1.sif"
         shell: "gatk --java-options '-Xmx8g' CNNScoreVariants -R {STOCK_GENOME_FASTA} -I {input.bam} -V {input.vcf} -O {output} -L {input.interval_list} --tensor-type read_tensor"
 
     rule var_germ_03_TMP_CNN1D_ScoreVariants:
@@ -192,7 +223,7 @@ if is_whole_genome_or_exome:
         params: n="1", mem_per_cpu="8", R="'span[hosts=1] rusage[mem=8]'", \
             o="out/logs/variant_calling/intervals/score_variants_{interval}.out", eo="out/logs/variant_calling/intervals/score_variants_{interval}.err", \
             J="score_variants_{interval}"
-        singularity: "docker://broadinstitute/gatk:4.1.4.1"
+        singularity: "/lila/data/bicgrp/pipelines/pg2/sifs/gatk4.1.4.1.sif"
         shell: "gatk --java-options '-Xmx8g' CNNScoreVariants -R {STOCK_GENOME_FASTA} -V {input.vcf} -O {output} -L {input.interval_list}"
 
     HAPMAP=config['parameters']['genome_personalization_module']['variant_calling']['resources']['germline']['snps_db']
@@ -203,9 +234,9 @@ if is_whole_genome_or_exome:
         input: vcf="out/{study_group}/variant_calling/HTC-scattered/{sample}.HTC.{interval}.CNN-scored.vcf.gz",interval_list="out/{study_group}/variant_calling/intervals/{interval}-scattered.interval_list"
         output: temp("out/{study_group}/variant_calling/HTC-scattered/{sample}.HTC.{interval}.CNN-scored.tranched.vcf.gz")
         params: n="1", mem_per_cpu="4", R="'span[hosts=1] rusage[mem=4]'", \
-            o="out/logs/assign_tranches.out", eo="out/logs/assign_tranches.err", \
-            J="assign_tranches"
-        singularity: "docker://broadinstitute/gatk:4.1.4.1"
+            o="out/logs/variant_calling/assign_tranches/assign_tranches_{interval}.out", eo="out/logs/variant_calling/assign_tranches/assign_tranches_{interval}.err", \
+            J="assign_tranches{interval}"
+        singularity: "/lila/data/bicgrp/pipelines/pg2/sifs/gatk4.1.4.1.sif"
         shell: "gatk --java-options '-Xmx4g' FilterVariantTranches -V {input.vcf} --resource {HAPMAP} --resource {MILLS} --info-key CNN_2D --snp-tranche {SNP_TRANCHE} --indel-tranche {INDEL_TRANCHE} --invalidate-previous-filters -O {output} -L {input.interval_list}"
 
 else:

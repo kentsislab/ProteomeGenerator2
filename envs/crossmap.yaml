@@ -1,6 +1,7 @@
 name: crossmap
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
 dependencies:
+  - bx-python=0.11.0
   - crossmap=0.3.9
